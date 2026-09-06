@@ -1,104 +1,37 @@
-const TMDB_API_KEY = 'e0454b55527f15c2784604a0bc84df14';
-const BASE_URL = 'https://api.themoviedb.org/3';
-const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+name: 30-Min Live AI News Bot
 
-let currentPage = 'movies';
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
-function switchPage(page, btn) {
-  currentPage = page;
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-  const filterBar = document.getElementById('newsFilterBar');
-  filterBar.style.display = (page === 'news') ? 'flex' : 'none';
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-  if (page === 'news') {
-    loadNewsData();
-  } else {
-    fetchTMDBData(page);
-  }
-}
+      - name: Install Dependencies
+        run: |
+          pip install google-generativeai requests
 
-async function fetchTMDBData(type) {
-  const content = document.getElementById('contentArea');
-  content.innerHTML = '<p>Fetching data from TMDB Engine...</p>';
+      - name: Execute News Engine
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+        run: python scripts/news_bot.py
 
-  let endpoint = '/trending/movie/day';
-  if (type === 'tv') endpoint = '/trending/tv/day';
-  if (type === 'people') endpoint = '/person/popular';
-  if (type === 'rewards') endpoint = '/movie/top_rated';
-
-  try {
-    const res = await fetch(`${BASE_URL}${endpoint}?api_key=${TMDB_API_KEY}`);
-    const data = await res.json();
-    renderCards(data.results, type);
-  } catch (err) {
-    content.innerHTML = '<p>Error fetching TMDB Data.</p>';
-  }
-}
-
-function renderCards(items, type) {
-  const content = document.getElementById('contentArea');
-  content.innerHTML = items.map(item => {
-    const title = item.title || item.name;
-    const poster = (item.poster_path || item.profile_path) ? `${IMG_URL}${item.poster_path || item.profile_path}` : 'https://via.placeholder.com/500x750';
-    return `
-      <div class="card" onclick="openDetails('${type}', ${item.id})">
-        <img src="${poster}" alt="${title}">
-        <div class="card-body">
-          <div class="card-title">${title}</div>
-          <small style="color:#01b4e4;">⭐ ${item.vote_average ? item.vote_average.toFixed(1) : 'Popular'}</small>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function handleLiveSearch(event) {
-  const query = event.target.value.trim();
-  if (query.length < 2) return;
-
-  const content = document.getElementById('contentArea');
-  const res = await fetch(`${BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`);
-  const data = await res.json();
-  renderCards(data.results, 'search');
-}
-
-// Subscription & Tracking Logic
-async function handleSubscribe() {
-  const emailInput = document.getElementById('subEmail');
-  const status = document.getElementById('subStatus');
-  const email = emailInput.value.trim();
-
-  if (!email || !email.includes('@')) {
-    status.innerText = "Please enter a valid email address.";
-    status.style.color = "#ff6b6b";
-    return;
-  }
-
-  try {
-    const geoRes = await fetch('https://ipapi.co/json/');
-    const geoData = await geoRes.json();
-    
-    const subscriberData = {
-      email: email,
-      country: geoData.country_name || "Unknown",
-      countryCode: geoData.country_code || "XX",
-      subscribedAt: new Date().toISOString()
-    };
-
-    console.log("Subscriber Captured:", subscriberData);
-    status.innerText = `Subscribed successfully from ${subscriberData.country}!`;
-    status.style.color = "#90cea1";
-    emailInput.value = "";
-  } catch (e) {
-    status.innerText = "Subscribed successfully!";
-    status.style.color = "#90cea1";
-  }
-}
-
-function closeModal() {
-  document.getElementById('detailsModal').style.display = 'none';
-}
-
-switchPage('movies');
+      - name: Commit & Push Changes
+        run: |
+          git config --global user.name "MediaDB Bot"
+          git config --global user.email "bot@mediadb.com"
+          git add data/
+          git commit -m "Auto-update news and data" || exit 0
+          git push
