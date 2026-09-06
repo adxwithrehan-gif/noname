@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineHub - TMDB Live Database</title>
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #1a202c;
+      --primary: #01b4e4;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text); margin: 0; padding: 0; }
+    header { background-color: var(--card-bg); padding: 20px; text-align: center; border-bottom: 2px solid var(--primary); }
+    header h1 { margin: 0 0 15px 0; color: var(--primary); font-size: 28px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    
+    /* Search Bar */
+    .search-box { display: flex; justify-content: center; margin-bottom: 20px; }
+    .search-input { width: 100%; max-width: 500px; padding: 12px 20px; border-radius: 25px; border: 1px solid #2d3748; background: #161e2e; color: #fff; font-size: 16px; outline: none; }
+    .search-input:focus { border-color: var(--primary); }
+
+    /* Tabs Navigation */
+    .nav-tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+    .tab-btn { background: var(--card-bg); color: var(--text); border: 1px solid #2d3748; padding: 10px 24px; border-radius: 20px; cursor: pointer; font-size: 15px; font-weight: 600; transition: all 0.3s ease; }
+    .tab-btn.active, .tab-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+    
+    /* Content Grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+    
+    /* Cards */
+    .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; position: relative; }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(1, 180, 228, 0.2); }
+    .card img { width: 100%; height: 300px; object-fit: cover; background-color: #2d3748; display: block; }
+    .card-info { padding: 15px; }
+    .card-title { font-size: 16px; font-weight: bold; margin: 0 0 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-meta { font-size: 13px; color: var(--text-muted); display: flex; justify-content: space-between; }
+    .rating { background: rgba(0,0,0,0.8); color: #ffd700; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; position: absolute; top: 10px; right: 10px; }
+    
+    .loader { text-align: center; grid-column: 1 / -1; padding: 40px; color: var(--primary); font-size: 18px; }
+    .error { text-align: center; grid-column: 1 / -1; color: #fc8181; padding: 20px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>CineHub - TMDB Live Data</h1>
+    <!-- Live Search Bar -->
+    <div class="search-box">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search Movies, TV Shows, People..." onkeyup="handleSearch(event)">
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Categories -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="fetchData('movie', this)">Trending Movies</button>
+      <button class="tab-btn" onclick="fetchData('tv', this)">TV Shows</button>
+      <button class="tab-btn" onclick="fetchData('person', this)">Popular People</button>
+      <button class="tab-btn" onclick="fetchData('awards', this)">Top Rated (Awards)</button>
+    </div>
+
+    <!-- Data Display Area -->
+    <div id="contentGrid" class="grid"></div>
+  </div>
+
+  <script>
+    // TMDB API Key Configured
+    const API_KEY = 'e0454b55527f15c2784604a0bc84df14'; 
+    const BASE_URL = 'https://api.themoviedb.org/3';
+    const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+    const grid = document.getElementById('contentGrid');
+
+    // Fetch Category Data
+    async function fetchData(type, clickedBtn = null) {
+      if(clickedBtn) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        clickedBtn.classList.add('active');
+      }
+
+      grid.innerHTML = '<div class="loader">Fetching latest data...</div>';
+
+      let url = '';
+      if (type === 'movie') url = `${BASE_URL}/trending/movie/day?api_key=${API_KEY}`;
+      if (type === 'tv') url = `${BASE_URL}/trending/tv/day?api_key=${API_KEY}`;
+      if (type === 'person') url = `${BASE_URL}/person/popular?api_key=${API_KEY}`;
+      if (type === 'awards') url = `${BASE_URL}/movie/top_rated?api_key=${API_KEY}`; 
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API Request Failed');
+        const data = await response.json();
+        renderCards(data.results, type);
+      } catch (error) {
+        grid.innerHTML = `<div class="error">Error loading content. Please try again later.</div>`;
+      }
+    }
+
+    // Search Feature
+    async function handleSearch(event) {
+      const query = event.target.value.trim();
+      if (query.length < 2) return;
+
+      grid.innerHTML = '<div class="loader">Searching...</div>';
+      
+      // Clear active tab styles when searching
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      const url = `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        renderCards(data.results, 'search');
+      } catch (error) {
+        grid.innerHTML = `<div class="error">Search failed. Try again.</div>`;
+      }
+    }
+
+    // Render Cards to Page
+    function renderCards(items, type) {
+      grid.innerHTML = '';
+      
+      if (!items || items.length === 0) {
+        grid.innerHTML = '<div class="error">No results found.</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        const title = item.title || item.name;
+        const imagePath = item.poster_path || item.profile_path;
+        const img = imagePath ? (IMG_URL + imagePath) : 'https://placehold.co/500x750/2d3748/fff?text=No+Image';
+        
+        let subText = '';
+        let ratingBadge = '';
+        
+        const mediaType = item.media_type || type;
+
+        if (mediaType === 'person') {
+          subText = `Known for: ${item.known_for_department || 'Acting'}`;
+        } else {
+          const date = item.release_date || item.first_air_date || 'N/A';
+          subText = `Year: ${date !== 'N/A' ? date.split('-')[0] : 'N/A'}`;
+          if (item.vote_average) {
+            ratingBadge = `<div class="rating">⭐ ${(item.vote_average).toFixed(1)}</div>`;
+          }
+        }
+
+        const cardHTML = `
+          <div class="card">
+            ${ratingBadge}
+            <img src="${img}" alt="${title}" loading="lazy">
+            <div class="card-info">
+              <h3 class="card-title" title="${title}">${title}</h3>
+              <div class="card-meta">
+                <span>${subText}</span>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        grid.innerHTML += cardHTML;
+      });
+    }
+
+    // Default load: Trending Movies
+    fetchData('movie');
+  </script>
+</body>
+</html>
