@@ -31,7 +31,7 @@
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
     
     /* Cards */
-    .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; position: relative; }
+    .card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.2s; position: relative; cursor: pointer; }
     .card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(1, 180, 228, 0.2); }
     .card img { width: 100%; height: 300px; object-fit: cover; background-color: #2d3748; display: block; }
     .card-info { padding: 15px; }
@@ -39,6 +39,16 @@
     .card-meta { font-size: 13px; color: var(--text-muted); display: flex; justify-content: space-between; }
     .rating { background: rgba(0,0,0,0.8); color: #ffd700; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; position: absolute; top: 10px; right: 10px; }
     
+    /* Modal / Popup Styling */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+    .modal-content { background: var(--card-bg); border-radius: 12px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; border: 1px solid var(--primary); }
+    .close-btn { position: absolute; top: 15px; right: 20px; font-size: 28px; color: #fff; cursor: pointer; z-index: 10; }
+    .modal-banner { width: 100%; height: 280px; object-fit: cover; }
+    .modal-body { padding: 20px; }
+    .modal-title { font-size: 24px; margin: 0 0 10px 0; color: var(--primary); }
+    .modal-desc { line-height: 1.6; color: var(--text); margin-top: 15px; }
+    .badge { display: inline-block; background: #2d3748; padding: 5px 10px; border-radius: 5px; font-size: 12px; margin-right: 5px; margin-bottom: 5px; }
+
     .loader { text-align: center; grid-column: 1 / -1; padding: 40px; color: var(--primary); font-size: 18px; }
     .error { text-align: center; grid-column: 1 / -1; color: #fc8181; padding: 20px; }
   </style>
@@ -47,14 +57,12 @@
 
   <header>
     <h1>CineHub - TMDB Live Data</h1>
-    <!-- Live Search Bar -->
     <div class="search-box">
       <input type="text" id="searchInput" class="search-input" placeholder="Search Movies, TV Shows, People..." onkeyup="handleSearch(event)">
     </div>
   </header>
 
   <div class="container">
-    <!-- Categories -->
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="fetchData('movie', this)">Trending Movies</button>
       <button class="tab-btn" onclick="fetchData('tv', this)">TV Shows</button>
@@ -62,18 +70,24 @@
       <button class="tab-btn" onclick="fetchData('awards', this)">Top Rated (Awards)</button>
     </div>
 
-    <!-- Data Display Area -->
     <div id="contentGrid" class="grid"></div>
   </div>
 
+  <!-- Detail Popup Modal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeModal()">&times;</span>
+      <div id="modalData"></div>
+    </div>
+  </div>
+
   <script>
-    // TMDB API Key Configured
     const API_KEY = 'e0454b55527f15c2784604a0bc84df14'; 
     const BASE_URL = 'https://api.themoviedb.org/3';
     const IMG_URL = 'https://image.tmdb.org/t/p/w500';
+    const BACKDROP_URL = 'https://image.tmdb.org/t/p/w780';
     const grid = document.getElementById('contentGrid');
 
-    // Fetch Category Data
     async function fetchData(type, clickedBtn = null) {
       if(clickedBtn) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -90,22 +104,18 @@
 
       try {
         const response = await fetch(url);
-        if (!response.ok) throw new Error('API Request Failed');
         const data = await response.json();
         renderCards(data.results, type);
       } catch (error) {
-        grid.innerHTML = `<div class="error">Error loading content. Please try again later.</div>`;
+        grid.innerHTML = `<div class="error">Error loading content.</div>`;
       }
     }
 
-    // Search Feature
     async function handleSearch(event) {
       const query = event.target.value.trim();
       if (query.length < 2) return;
 
       grid.innerHTML = '<div class="loader">Searching...</div>';
-      
-      // Clear active tab styles when searching
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
 
       const url = `${BASE_URL}/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(query)}`;
@@ -115,11 +125,10 @@
         const data = await response.json();
         renderCards(data.results, 'search');
       } catch (error) {
-        grid.innerHTML = `<div class="error">Search failed. Try again.</div>`;
+        grid.innerHTML = `<div class="error">Search failed.</div>`;
       }
     }
 
-    // Render Cards to Page
     function renderCards(items, type) {
       grid.innerHTML = '';
       
@@ -135,8 +144,7 @@
         
         let subText = '';
         let ratingBadge = '';
-        
-        const mediaType = item.media_type || type;
+        const mediaType = item.media_type || (type === 'awards' ? 'movie' : type);
 
         if (mediaType === 'person') {
           subText = `Known for: ${item.known_for_department || 'Acting'}`;
@@ -149,7 +157,7 @@
         }
 
         const cardHTML = `
-          <div class="card">
+          <div class="card" onclick="openDetails('${mediaType}', ${item.id})">
             ${ratingBadge}
             <img src="${img}" alt="${title}" loading="lazy">
             <div class="card-info">
@@ -165,7 +173,53 @@
       });
     }
 
-    // Default load: Trending Movies
+    // Fetch Details on Click
+    async function openDetails(mediaType, id) {
+      const modal = document.getElementById('detailModal');
+      const modalData = document.getElementById('modalData');
+      modal.style.display = 'flex';
+      modalData.innerHTML = '<div class="loader">Loading details...</div>';
+
+      try {
+        const res = await fetch(`${BASE_URL}/${mediaType}/${id}?api_key=${API_KEY}`);
+        const data = await res.json();
+
+        const title = data.title || data.name;
+        const banner = data.backdrop_path ? (BACKDROP_URL + data.backdrop_path) : (data.poster_path ? IMG_URL + data.poster_path : '');
+        const overview = data.overview || data.biography || 'No overview available.';
+        const rating = data.vote_average ? `⭐ ${data.vote_average.toFixed(1)} / 10` : '';
+        
+        let extraInfo = '';
+        if (data.genres) {
+          extraInfo = data.genres.map(g => `<span class="badge">${g.name}</span>`).join(' ');
+        } else if (data.place_of_birth) {
+          extraInfo = `<span class="badge">Birthplace: ${data.place_of_birth}</span>`;
+        }
+
+        modalData.innerHTML = `
+          ${banner ? `<img src="${banner}" class="modal-banner" alt="${title}">` : ''}
+          <div class="modal-body">
+            <h2 class="modal-title">${title}</h2>
+            <div>${rating ? `<span class="badge" style="background:#01b4e4; color:#000;">${rating}</span>` : ''} ${extraInfo}</div>
+            <p class="modal-desc">${overview}</p>
+          </div>
+        `;
+      } catch (err) {
+        modalData.innerHTML = '<div class="error">Failed to load details.</div>';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+      const modal = document.getElementById('detailModal');
+      if (event.target == modal) {
+        modal.style.display = 'none';
+      }
+    }
+
     fetchData('movie');
   </script>
 </body>
