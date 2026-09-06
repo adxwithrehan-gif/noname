@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaDB - News</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo"><h2>MediaDB</h2></div>
+        <nav>
+            <a href="index.html">Movies/Web Series</a>
+            <a href="tv-shows.html">TV Shows</a>
+            <a href="popular-people.html">Popular People</a>
+            <a href="rewards.html">Rewards</a>
+            <a href="news.html">News</a>
+        </nav>
+    </header>
+
+    <div class="ad-slot">-- Header Advertisement Area --</div>
+
+    <div class="container">
+        <input type="text" id="searchInput" onkeyup="liveSearch()" placeholder="Search Movies, Shows, People, News..." style="width: 100%; padding: 12px; margin-bottom: 20px; box-sizing: border-box;">
+        
+        
+            <div class="filter-bar">
+                <select id="countryFilter"><option>All Countries</option><option>USA</option><option>Worldwide</option></select>
+                <select id="categoryFilter"><option>All Categories</option><option>Entertainment</option><option>Web Series</option></select>
+                <input type="date" id="dateFilter">
+            </div>
+            
+
+        <h1>News</h1>
+        <div class="ad-slot">-- Article Top Ad Position --</div>
+
+        <div class="card-grid" id="contentGrid">
+            <div class="card">
+                <img src="https://via.placeholder.com/500x750?text=MediaDB+Media" alt="Media Cover">
+                <div class="card-content">
+                    <h3>Sample Media / Trending Item</h3>
+                    <p>Automated payload synced with TMDB API & Gemini Engine.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ad-slot">-- Footer Advertisement Area --</div>
+
+    <footer>
+        <p>&copy; 2026 MediaDB. All Rights Reserved.</p>
+        <div class="subscribe-box">
+            <input type="email" id="subEmail" placeholder="Enter your email">
+            <button onclick="subscribeUser()">Subscribe</button>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
